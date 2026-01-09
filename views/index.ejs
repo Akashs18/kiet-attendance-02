@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Face Recognition Attendance</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    video { width: 320px; height: 240px; border: 1px solid #ccc; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    button { margin: 5px; padding: 10px 20px; }
+  </style>
+</head>
+<body>
+  <h1>Face Recognition Attendance</h1>
+
+  <div>
+    <input type="text" id="emp_id" placeholder="Employee ID">
+    <input type="text" id="emp_name" placeholder="Employee Name">
+  </div>
+
+  <video id="videoElement" autoplay muted></video><br>
+  <button id="registerBtn">Register</button>
+  <button id="attendanceBtn">Mark Attendance</button>
+
+  <h2>Attendance Table</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Emp ID</th>
+        <th>Emp Name</th>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Location</th>
+      </tr>
+    </thead>
+    <tbody id="attendanceTableBody">
+      <!-- rows will be inserted here -->
+    </tbody>
+  </table>
+
+  <script src="/script.js"></script>
+</body>
+</html>
