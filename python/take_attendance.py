@@ -1,10 +1,11 @@
-# python/take_attendance.py
 import sys
-import cv2
+import os
 import face_recognition
 import numpy as np
-import os
+import json
+from PIL import Image
 from datetime import datetime
+import psycopg2
 
 if len(sys.argv) != 2:
     print("Usage: python take_attendance.py <image_path>")
@@ -13,44 +14,81 @@ if len(sys.argv) != 2:
 image_path = sys.argv[1]
 print(f"Taking attendance from image: {image_path}")
 
-# Windows-safe image read
-image = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-if image is None:
-    print("Error: Failed to read image")
-    sys.exit(1)
+# Load image
+pil_image = Image.open(image_path).convert("RGB")
+image_rgb = np.array(pil_image, dtype=np.uint8)
 
-# Convert BGR -> RGB
-image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-# Load all registered encodings
+# Load encodings
 enc_dir = os.path.join("python", "encodings")
 if not os.path.exists(enc_dir):
     print("Error: No registered employees found")
     sys.exit(1)
 
-encodings_files = [f for f in os.listdir(enc_dir) if f.endswith(".npy")]
+enc_files = [f for f in os.listdir(enc_dir) if f.endswith(".npy")]
 known_encodings = []
 emp_ids = []
 
-for file in encodings_files:
-    emp_id = file.replace(".npy", "")
-    encoding = np.load(os.path.join(enc_dir, file))
-    known_encodings.append(encoding)
-    emp_ids.append(emp_id)
+for file in enc_files:
+    emp_ids.append(file.replace(".npy", ""))
+    known_encodings.append(np.load(os.path.join(enc_dir, file)))
 
-# Detect faces in the image
-faces = face_recognition.face_encodings(image_rgb)
+# Load names
+with open(os.path.join(enc_dir, "names.json"), "r") as f:
+    names_map = json.load(f)
+
+# Detect faces
+face_locations = face_recognition.face_locations(image_rgb, model="hog")
+faces = face_recognition.face_encodings(image_rgb, face_locations)
+
+print("Faces detected:", len(face_locations))
+
 if len(faces) == 0:
-    print("No faces detected in the image")
+    print("No faces detected")
     sys.exit(1)
 
-# Compare detected faces to known encodings
+# Connect to DB
+try:
+    conn = psycopg2.connect(
+        dbname="attendance_db",
+        user="firstdemo_examle_user",
+        password="6LBDu09slQHqq3r0GcwbY1nPera4H5Kk",
+        host="dpg-d50evbfgi27c73aje1pg-a.oregon-postgres.render.com",
+        port=5432,
+        sslmode="require"
+    )
+    cur = conn.cursor()
+except Exception as e:
+    print("DB CONNECTION ERROR:", e)
+    sys.exit(1)
+
+# Loop over detected faces
+attendance_marked = False
+
 for face in faces:
     matches = face_recognition.compare_faces(known_encodings, face, tolerance=0.5)
     if True in matches:
         idx = matches.index(True)
         emp_id = emp_ids[idx]
-        # For demo purposes, we just print
-        print(f"Attendance marked for Employee ID: {emp_id} at {datetime.now()}")
+        emp_name = names_map.get(emp_id, "Unknown")
+        location = "Office Entrance"
+
+        try:
+            cur.execute("""
+                INSERT INTO attendance (
+                    emp_id, emp_name, attendance_date, attendance_time, location
+                )
+                VALUES (%s, %s, CURRENT_DATE, CURRENT_TIME, %s)
+            """, (emp_id, emp_name, location))
+            conn.commit()
+            print(f"Attendance marked for {emp_name} ({emp_id})")
+            attendance_marked = True
+        except Exception as e:
+            print("DB INSERT ERROR:", e)
     else:
         print("Unknown face detected")
+
+cur.close()
+conn.close()
+
+if not attendance_marked:
+    print("No known faces marked for attendance")

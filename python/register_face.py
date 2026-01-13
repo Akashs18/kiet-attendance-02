@@ -1,42 +1,65 @@
-# python/register_face.py
 import sys
-import cv2
+import os
 import face_recognition
 import numpy as np
-import os
+import json
+import psycopg2
+from PIL import Image
 
-# Arguments: emp_id, emp_name, image_path
 if len(sys.argv) != 4:
     print("Usage: python register_face.py <emp_id> <emp_name> <image_path>")
     sys.exit(1)
 
-emp_id = sys.argv[1]
-emp_name = sys.argv[2]
-image_path = sys.argv[3]
+emp_id, emp_name, image_path = sys.argv[1:4]
 
-print(f"Registering Employee: {emp_id}, {emp_name}")
-print(f"Reading image: {image_path}")
+# Load image
+image = Image.open(image_path).convert("RGB")
+image_rgb = np.array(image)
 
-# Windows-safe image read
-image = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
-
-if image is None:
-    print("Error: Failed to read image. Check path or file type.")
-    sys.exit(1)
-
-# Convert BGR -> RGB
-image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-# Detect face encodings
 encodings = face_recognition.face_encodings(image_rgb)
-if len(encodings) == 0:
-    print("Error: No faces detected!")
+if not encodings:
+    print("ERROR: No face detected")
     sys.exit(1)
 
-# Save encoding for future attendance (as .npy file)
-enc_dir = os.path.join("python", "encodings")
-os.makedirs(enc_dir, exist_ok=True)
-encoding_file = os.path.join(enc_dir, f"{emp_id}.npy")
-np.save(encoding_file, encodings[0])
+encoding = encodings[0]
 
-print(f"Employee {emp_name} registered successfully! Encoding saved at {encoding_file}")
+os.makedirs("python/encodings", exist_ok=True)
+np.save(f"python/encodings/{emp_id}.npy", encoding)
+
+names_file = "python/encodings/names.json"
+names = {}
+if os.path.exists(names_file):
+    with open(names_file) as f:
+        names = json.load(f)
+
+names[emp_id] = emp_name
+with open(names_file, "w") as f:
+    json.dump(names, f)
+
+# DB insert
+try:
+    conn = psycopg2.connect(
+        dbname="attendance_db",
+        user="firstdemo_examle_user",
+        password="6LBDu09slQHqq3r0GcwbY1nPera4H5Kk",
+        host="dpg-d50evbfgi27c73aje1pg-a.oregon-postgres.render.com",
+        port=5432,
+        sslmode="require"
+    )
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO employees (emp_id, emp_name)
+        VALUES (%s, %s)
+        ON CONFLICT (emp_id) DO NOTHING
+    """, (emp_id, emp_name))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    print(f"SUCCESS: Employee {emp_name} registered in DB")
+
+except Exception as e:
+    print("DB ERROR:", e)
+    sys.exit(1)

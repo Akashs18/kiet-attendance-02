@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <title>Face Recognition Attendance</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
+    body { font-family: Arial; margin: 20px; }
     video { width: 320px; height: 240px; border: 1px solid #ccc; }
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
     button { margin: 5px; padding: 10px 20px; }
   </style>
 </head>
@@ -31,12 +31,9 @@
         <th>Emp Name</th>
         <th>Date</th>
         <th>Time</th>
-        <th>Location</th>
       </tr>
     </thead>
-    <tbody id="attendanceTableBody">
-      <!-- rows will be inserted here -->
-    </tbody>
+    <tbody id="attendanceTableBody"></tbody>
   </table>
 
   <script src="/script.js"></script>
